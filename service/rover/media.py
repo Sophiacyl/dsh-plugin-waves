@@ -73,7 +73,7 @@ async def render_png(name: str) -> Optional[Path]:
     from playwright.async_api import async_playwright
 
     async with async_playwright() as driver:
-        browser = await driver.chromium.launch(args=["--disable-gpu"])
+        browser = await driver.chromium.launch(args=["--disable-gpu", "--disable-dev-shm-usage"])
         try:
             page = await browser.new_page(viewport={"width": 1600, "height": 1200})
             await page.goto(source.as_uri(), wait_until="load")

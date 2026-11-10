@@ -53,6 +53,7 @@ class ChatRequest(BaseModel):
     images: Optional[List[str]] = None
     file_name: Optional[str] = None
     file_data: Optional[str] = None
+    native: bool = False
 
 
 @app.get("/api/health")
@@ -61,11 +62,17 @@ async def health() -> Dict[str, Any]:
 
     from rover.sv import all_prefixes
 
+    from rover.app_life import _plugins_loaded, plugin_load_errors
+
+    commands = sum(len(t) for sv in SL.lst.values() for t in sv.TL.values())
     return {
-        "ok": True,
+        "ok": _plugins_loaded and not plugin_load_errors and commands > 0,
         "plugins": list(SL.plugins.keys()),
-        "commands": sum(len(t) for sv in SL.lst.values() for t in sv.TL.values()),
+        "commands": commands,
         "prefixes": all_prefixes(),
+        "load_errors": list(plugin_load_errors),
+        "resources_ready": bool(getattr(app.state, "resources_ready", False)),
+        "resource_error": getattr(app.state, "resource_error", None),
     }
 
 
@@ -89,6 +96,9 @@ async def chat(req: ChatRequest) -> Dict[str, Any]:
     logger.info(f"[命令] {command} (scene={user_type})")
     result = await dispatch(message)
     rendered = await render_segments(result["segments"])
+    if req.native:
+        from rover.native_media import native_segments
+        rendered = await native_segments(rendered)
 
     if result["unmatched"]:
         return {
@@ -113,6 +123,7 @@ class PanelRenderRequest(BaseModel):
     uid: Optional[str] = None
     echoes: Optional[List[Dict[str, Any]]] = None
     change: Optional[str] = None
+    native: bool = False
 
 
 @app.post("/api/render/panel")
@@ -133,6 +144,9 @@ async def render_panel(req: PanelRenderRequest) -> Dict[str, Any]:
             "elapsed": round(time.perf_counter() - started, 3),
         }
     rendered = await render_segments(sink)
+    if req.native:
+        from rover.native_media import native_segments
+        rendered = await native_segments(rendered)
     return {
         "ok": True,
         "summary": summarize(rendered) or "已渲染",

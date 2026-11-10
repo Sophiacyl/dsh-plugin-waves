@@ -16,6 +16,40 @@
 
 开新会话首次发送指令将同时发送你好，此为dsh目前固有限制，否则无法显示指令结果。
 
+## dsh-go 原生适配（本分支）
+
+本分支是基于 [Loping151/dsh-plugin-waves](https://github.com/Loping151/dsh-plugin-waves) 的 dsh-go 测试适配，保留上游历史及 GPL-3.0 许可证。适配代码位于本 fork 的 `dsh-go` 分支；聊天新媒体卡片的 App 内最终显示仍待确认，详见 [验证记录](./DSH-GO-VERIFICATION.md)。
+
+支持 DSH `0.2.2-rc.1` 和 dsh-go 原生界面：
+
+- 输入框上方「鸣潮」胶囊打开查询面板；「全部功能」内提供「鸣潮查询」「鸣潮设置」。
+- `waves` / `waves_panel` 聊天结果通过 `dsh-go/media` 返回本机文件图片；原生查询面板使用 `asset:文件名` 由 App 带权限读取。两条显示通道分开处理，避免把面板资源引用用于无插件归属的聊天工具卡片。`/ww` 始终保留摘要，可在查询面板点「刷新结果」查看最近的图。
+- HTML 面板在本机无头 Chromium 中截图后生成不超过 1 MiB、4096 像素边长及 400 万像素的原生图片。原来的 Web 卡片和配置页仍保留。
+- 原生设置支持分组、分页、单项保存。敏感项不回显，使用系统文件选择器导入单项 UTF-8 文本；文件上传项也使用系统选择器。文件选择需要支持 files 能力的较新 App。
+- Linux ARM64 + Python 3.12 已实测 8 个计算扩展加载、OCR 初始化与识别、39 个上游功能模块、帮助命令截图。账号数据查询和伤害结果仍需用户自行登录并配置相应 token。
+- 安装准备改为异步、有超时、可取消；失败不启动服务，连续崩溃 5 次后停止重试。Python 默认复用受支持的系统版本。
+
+手机安装本适配分支（保留克隆目录，它同时保存插件环境和运行数据）：
+
+```sh
+PLUGIN_DIR="${DSH_HOME:-$HOME/.dsh}/dsh-go/plugins/dsh-plugin-waves"
+git clone --branch dsh-go --single-branch \
+  https://github.com/Sophiacyl/dsh-plugin-waves.git "$PLUGIN_DIR"
+dsh plugin --profile web add "link:$PLUGIN_DIR"
+```
+
+目录已存在时先检查现有安装，不要覆盖或删除。`$DSH_HOME` 未设置时默认为 `~/.dsh`。代码更新后可重载该插件；无需为素材下载重启整个引擎。首次启动会下载上游素材，健康接口的 `resources_ready` 独立报告准备状态。
+
+宿主与原生协议回归（路径按本机安装调整）：
+
+```sh
+DSH_TEST_RUNTIME=/opt/dsh \
+DSH_GO_KIT=$HOME/.dsh/skills/dsh-go-plugin/kit npm test
+WAVES_AUTOSTART=0 node $HOME/.dsh/skills/dsh-go-plugin/kit/bin/check.mjs . --load
+```
+
+`WAVES_AUTOSTART=0` 仅用于隔离验证，防止检查器启动第二个后端。初次环境安装使用 `bash install.sh --env-only`；浏览器若缺系统库，需另执行 `service/.venv/bin/python -m playwright install-deps chromium`。本分支使用 `rapidocr` 3.x 和 headless OpenCV，避免旧 OCR 引入图形版 OpenCV。
+
 ## 用例
 
 <table>
@@ -41,7 +75,7 @@
 
 ## 安装
 
-已验证 DSH `0.1.0-rc.7`、`0.2.0-rc.2` 与 `0.2.1-rc.2`，需要 Node.js 22.19+ 或 24.2+（DSH 0.2.1 在 24.0/24.1 上会静默退出）。DSH 0.2 支持斜杠命令携带图片和单个文件；旧版可继续执行无附件命令。
+上游已验证 DSH `0.1.0-rc.7`、`0.2.0-rc.2` 与 `0.2.1-rc.2`。本适配分支另通过了 DSH `0.2.2-rc.1` 的真实宿主库兼容测试（工具定义、参数校验、模拟服务调用与结果展示元数据），不代表 Python 后端和手机原生界面已完成验证。需要 Node.js 22.19+ 或 24.2+（DSH 0.2.1 在 24.0/24.1 上会静默退出）。DSH 0.2 支持斜杠命令携带图片和单个文件；旧版可继续执行无附件命令。
 
 Linux / macOS：
 
@@ -116,8 +150,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -Src C:\gsuid_core\data
 群成员管理、群排行、公告订阅、订阅签到结果、联系主人这类只在群聊里成立的命令不注册。
 内置 HTTP 接口见 [docs/api.md](./docs/api.md)。
 
-带截图的命令（`ww评分`、`ww分析`）走模型时直接把图和话一起发即可：图片不会进模型
-（DeepSeek 文本路由不吃图），host 会暂存并在模型调用工具时随命令转交服务。
+带截图的命令（`ww评分`、`ww分析`）可通过 `/ww 评分` 或 `/ww 分析` 携带图片直接执行，不经过模型。
+普通聊天图片保持原始附件，不会被插件替换成提示文字，也不会改写模型能力。使用支持图片的模型时，
+插件仅暂存当前输入的附件引用，在明确调用 `waves(with_image=true)` 时转交鸣潮服务；文本模型是否接收图片由宿主决定。
 模型还可以用 `waves_panel` 工具按自定义数据（跨角色借声骸、手填词条）渲一张假设面板——
 只在本地渲染，不写用户数据、不上传总排行。
 

@@ -35,12 +35,29 @@
       "platform": "web"
     }
   },
+  "dshGo": {
+    "v": 1,
+    "title": { "zh": "鸣潮", "en": "Waves" },
+    "icon": "star",
+    "assets": "service/data/media",
+    "capabilities": ["files"],
+    "contributes": {
+      "composer.actions": [
+        { "id": "waves-open", "label": "鸣潮", "icon": "star", "effect": { "type": "open", "page": "panel:waves-home" } }
+      ],
+      "panels": [
+        { "id": "waves-home", "title": "鸣潮查询", "icon": "star", "placement": ["session.tab", "features", "chat.panel"] },
+        { "id": "waves-settings", "title": "鸣潮设置", "icon": "settings", "placement": ["features"] },
+        { "id": "waves-edit", "title": "修改设置", "icon": "edit", "placement": ["plugin"] }
+      ]
+    }
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7 || ^0.2.0-rc.2",
-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.7 || ^0.2.0-rc.2",
-    "@deepseek-ai/dsh-commands": "^0.1.0-rc.7 || ^0.2.0-rc.2",
-    "@deepseek-ai/dsh-attachment": "^0.1.0-rc.7 || ^0.2.0-rc.2"
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7 || ^0.2.0-rc.2 || 0.2.2-rc.1",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.7 || ^0.2.0-rc.2 || 0.2.2-rc.1",
+    "@deepseek-ai/dsh-commands": "^0.1.0-rc.7 || ^0.2.0-rc.2 || 0.2.2-rc.1",
+    "@deepseek-ai/dsh-attachment": "^0.1.0-rc.7 || ^0.2.0-rc.2 || 0.2.2-rc.1"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
@@ -64,7 +81,7 @@
   },
   "engines": {
     "node": "^22.19.0 || >=24.2.0",
-    "dsh": "^0.1.0-rc.7 || ^0.2.0-rc.2"
+    "dsh": "^0.1.0-rc.7 || ^0.2.0-rc.2 || 0.2.2-rc.1"
   },
   "icon": "./ICON.png"
 }

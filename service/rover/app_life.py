@@ -47,6 +47,7 @@ CONFIG_SEED = {
 }
 
 _plugins_loaded = False
+plugin_load_errors = []
 
 
 def _inner_package(name: str) -> str:
@@ -77,6 +78,7 @@ def load_plugins() -> None:
         try:
             package = importlib.import_module(package_name)
         except Exception as e:
+            plugin_load_errors.append(name)
             logger.error(f"[加载] 插件 {name} 载入失败: {e}")
             logger.exception(e)
             continue
@@ -93,6 +95,7 @@ def load_plugins() -> None:
                 importlib.import_module(f"{package_name}.{module.name}")
                 loaded += 1
             except Exception as e:
+                plugin_load_errors.append(f"{name}.{module.name}")
                 logger.error(f"[加载] 模块 {name}.{module.name} 载入失败: {e}")
                 logger.exception(e)
         logger.success(f"[加载] {name} 已载入 {loaded} 个功能模块")
@@ -116,13 +119,26 @@ async def lifespan(app: FastAPI):
     load_plugins()
     await init_all()
     await core_start_before_execute()
-    asyncio.create_task(core_start_execute())
+    app.state.resources_ready = False
+    app.state.resource_error = None
+
+    async def prepare_resources():
+        try:
+            await core_start_execute()
+            app.state.resources_ready = True
+        except Exception as error:
+            app.state.resource_error = str(error)
+            logger.exception(error)
+
+    resource_task = asyncio.create_task(prepare_resources())
     register_cleanup_job()
     await start_scheduler()
     logger.success("[服务] 启动完成")
     try:
         yield
     finally:
+        resource_task.cancel()
+        await asyncio.gather(resource_task, return_exceptions=True)
         await stop_scheduler()
         await core_shutdown_execute()
         logger.info("[服务] 已停止")

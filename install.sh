@@ -8,7 +8,10 @@ SERVICE="$ROOT/service"
 PROFILE="${DSH_PROFILE:-web}"
 # 计算内核按 CPython 版本分发, 仅这些版本有对应包
 SUPPORTED=(3.13 3.12 3.11 3.10)
-PYTHON_VERSION="${PYTHON_VERSION:-3.13}"
+# Reuse a supported system interpreter, especially the bundled ARM64 Python.
+if [ -z "${PYTHON_VERSION:-}" ]; then
+  PYTHON_VERSION="$(python3 -c 'import sys; v=f"{sys.version_info.major}.{sys.version_info.minor}"; print(v if v in ("3.10", "3.11", "3.12", "3.13") else "3.13")' 2>/dev/null || printf '3.13')"
+fi
 
 # 由插件在首次启动时调用: 只准备环境, 不碰 dsh 自身
 ENV_ONLY=0
@@ -63,7 +66,12 @@ if ! have curl && ! have wget; then
   pkg_install curl || fail "缺少 curl/wget, 自动安装失败, 请先装其中一个"
 fi
 
-if ! have uv; then
+SYSTEM_PYTHON=""
+if have python3 && [ "$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "$PYTHON_VERSION" ]; then
+  SYSTEM_PYTHON="$(command -v python3)"
+fi
+
+if [ -z "$SYSTEM_PYTHON" ] && ! have uv; then
   step "安装 uv"
   if have curl; then
     curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
@@ -76,7 +84,9 @@ if ! have uv; then
     refresh_path
   fi
 fi
-have uv || fail "缺少 uv 且自动安装失败, 请手工装: curl -LsSf https://astral.sh/uv/install.sh | sh"
+if [ -z "$SYSTEM_PYTHON" ]; then
+  have uv || fail "缺少 uv 且自动安装失败, 请先安装受支持的 Python 或 uv"
+fi
 
 if ! have git; then
   step "安装 git"
@@ -94,25 +104,65 @@ fi
 
 step "准备 Python $PYTHON_VERSION"
 # 系统没有对应版本时, uv 直接拉官方构建, 不必先装发行版 Python
-uv python install "$PYTHON_VERSION" >/dev/null || true
+if [ -z "$SYSTEM_PYTHON" ]; then uv python install "$PYTHON_VERSION" >/dev/null; fi
 
 step "创建虚拟环境 (Python $PYTHON_VERSION)"
 cd "$SERVICE"
 if [ ! -x .venv/bin/python ]; then
-  uv venv --python "$PYTHON_VERSION" .venv
+  if [ -n "$SYSTEM_PYTHON" ]; then
+    "$SYSTEM_PYTHON" -m venv .venv
+  else
+    uv venv --python "$PYTHON_VERSION" --seed .venv
+  fi
 fi
 ACTUAL="$(.venv/bin/python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 printf '%s\n' "${SUPPORTED[@]}" | grep -qx "$ACTUAL" \
   || fail "虚拟环境是 Python $ACTUAL, 不在支持范围; 删掉 service/.venv 重跑"
 
 step "安装依赖"
-uv pip install --python .venv/bin/python -q -r pyproject.toml
+# Old RapidOCR required GUI OpenCV; remove that conflicting cv2 distribution
+# before installing the headless-only stack (inside this venv only).
 .venv/bin/python - <<'PY'
-import importlib.util as u, sys
-need = ("cv2", "cryptography", "fastapi", "sqlmodel", "PIL", "jinja2", "lxml", "msgspec")
-missing = [n for n in need if u.find_spec(n) is None]
-sys.exit("依赖缺失: " + ", ".join(missing)) if missing else print("依赖自检通过")
+import importlib.metadata as m, subprocess, sys
+for name in ("rapidocr-onnxruntime", "opencv-python"):
+    try:
+        m.version(name)
+    except m.PackageNotFoundError:
+        continue
+    subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", name], check=True)
 PY
+.venv/bin/python - <<'PY'
+import pathlib, subprocess, sys
+try:
+    import tomllib
+except ImportError:
+    subprocess.run([sys.executable, "-m", "pip", "install", "tomli"], check=True)
+    import tomli as tomllib
+requirements = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["dependencies"]
+subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", *requirements], check=True)
+# Both OpenCV distributions own cv2; repairing headless restores any removed files.
+subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps", "opencv-python-headless>=4.9,<5"], check=True)
+PY
+.venv/bin/python - <<'PY'
+import cv2, cryptography, fastapi, sqlmodel, PIL, jinja2, lxml, msgspec, rapidocr, onnxruntime
+print("依赖加载自检通过")
+PY
+
+step "准备原生卡片截图浏览器"
+.venv/bin/python -m playwright install --only-shell chromium
+.venv/bin/python - <<'PY'
+import asyncio
+from playwright.async_api import async_playwright
+async def check():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(args=["--disable-gpu", "--disable-dev-shm-usage"])
+        await browser.close()
+try:
+    asyncio.run(check())
+except Exception:
+    raise SystemExit("截图浏览器缺少系统库，请在插件目录执行 service/.venv/bin/python -m playwright install-deps chromium 后重试")
+PY
+mkdir -p data/media
 
 step "拉取插件"
 .venv/bin/python tools/update_plugins.py

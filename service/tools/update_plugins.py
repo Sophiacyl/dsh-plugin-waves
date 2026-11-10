@@ -99,13 +99,13 @@ def clone_with_fallback(name: str, dest: Path, github: str, cnb: str) -> str:
     if result.returncode:
         _rm_incomplete(dest)
         if not is_unreachable(result):
-            return f"{name}: 克隆失败 {result.stderr.strip()[:160]}"
+            raise RuntimeError(f"{name}: 克隆失败 {result.stderr.strip()[:160]}")
         print(f"{name}: GitHub 不可达, 改用 cnb {cnb}")
         result = run(["git", "clone", "--depth", "1", cnb, str(dest)], timeout=CLONE_TIMEOUT)
         source = "cnb"
         if result.returncode:
             _rm_incomplete(dest)
-            return f"{name}: cnb 克隆也失败 {result.stderr.strip()[:160]}"
+            raise RuntimeError(f"{name}: cnb 克隆也失败 {result.stderr.strip()[:160]}")
     head = run(["git", "log", "--oneline", "-1"], cwd=dest).stdout.strip()
     return f"{name}: 已克隆 ({source}) {head}"
 
@@ -145,7 +145,7 @@ def sync_one(name: str, urls: dict) -> str:
     github, cnb = urls["github"], urls["cnb"]
     if not (dest / ".git").is_dir():
         if dest.exists():
-            return f"{name}: 目录已存在但不是 git 仓库, 请手工处理 {dest}"
+            raise RuntimeError(f"{name}: 目录已存在但不是 git 仓库, 请手工处理 {dest}")
         return clone_with_fallback(name, dest, github, cnb)
 
     dirty = run(["git", "status", "--porcelain"], cwd=dest).stdout
@@ -158,7 +158,7 @@ def sync_one(name: str, urls: dict) -> str:
     before = run(["git", "rev-parse", "--short", "HEAD"], cwd=dest).stdout.strip()
     err = pull_with_fallback(name, dest, github, cnb)
     if err:
-        return err
+        raise RuntimeError(err)
     after = run(["git", "rev-parse", "--short", "HEAD"], cwd=dest).stdout.strip()
     if before == after:
         return f"{name}: 已是最新 {after}"
@@ -171,6 +171,10 @@ def check_compat() -> int:
     sys.path.insert(0, str(PLUGINS_DIR.parent))
     from rover import compat
 
+    absent = [name for name in REPOS if not (PLUGINS_DIR / name / name / "__init__.py").is_file()]
+    if absent:
+        print("\n上游插件未完整安装: " + ", ".join(absent))
+        return 1
     missing = compat.missing_imports(PLUGINS_DIR)
     if missing:
         print("\n运行时缺少这些上游模块, 需要在 rover/compat.py 补映射:")
@@ -189,11 +193,16 @@ def main() -> None:
     PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
     (PLUGINS_DIR / "__init__.py").touch()
 
+    sync_failed = False
     if not args.check_only:
         for name, urls in REPOS.items():
-            print(sync_one(name, urls))
+            try:
+                print(sync_one(name, urls))
+            except RuntimeError as error:
+                sync_failed = True
+                print(str(error), file=sys.stderr)
 
-    code = check_compat()
+    code = 1 if sync_failed else check_compat()
     if not args.check_only:
         print("\n更新后请重启服务, 并跑 tools/regression.py 自检。")
     sys.exit(code)

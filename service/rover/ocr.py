@@ -22,9 +22,15 @@ def _get_engine():
     if _engine is not None or _engine_failed:
         return _engine
     try:
-        from rapidocr_onnxruntime import RapidOCR
+        from rapidocr import RapidOCR
 
-        _engine = RapidOCR()
+        # Headless OpenCV avoids X11/Qt dependencies on phone hosts. Bound ONNX
+        # worker pools so one screenshot cannot occupy every CPU core.
+        _engine = RapidOCR(params={
+            "EngineConfig.onnxruntime.intra_op_num_threads": 1,
+            "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+            "Global.log_level": "warning",
+        })
     except Exception as e:  # noqa: BLE001
         _engine_failed = True
         logger.warning(f"[OCR] rapidocr 不可用, 图片文字摘要关闭: {e}")
@@ -45,8 +51,8 @@ def _run(raw: bytes) -> str:
     scale = MAX_SIDE / max(h, w)
     if scale < 1:
         img = cv2.resize(img, (int(w * scale), int(h * scale)))
-    result, _ = engine(img)
-    lines = [str(item[1]).strip() for item in result or [] if item and item[1]]
+    result = engine(img)
+    lines = [str(text).strip() for text in result.txts or () if text]
     text = " ".join(x for x in lines if x)
     return text[:DIGEST_LIMIT] + " …" if len(text) > DIGEST_LIMIT else text
 

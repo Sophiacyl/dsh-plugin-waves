@@ -17,6 +17,7 @@ from .download_file import download
 async def _get_url(url: str, client: httpx.AsyncClient) -> bytes:
     try:
         response = await client.get(url)
+        response.raise_for_status()
         return response.read()
     except httpx.HTTPStatusError as exc:
         logger.warning(f"[资源下载] HTTP 错误: {url} {exc}")
@@ -117,9 +118,10 @@ async def download_atag_file(
             size_temp += size
             TASK = asyncio.create_task(download(file_url, path, name, client, TAG))
             TASKS.append(TASK)
-            if size_temp >= 1500000:
+            if size_temp >= 1500000 or len(TASKS) >= 4:
                 await asyncio.gather(*TASKS)
                 TASKS.clear()
+                size_temp = 0
     else:
         await asyncio.gather(*TASKS)
         TASKS.clear()
