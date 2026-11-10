@@ -18,10 +18,10 @@
 
 ## npm 测试版与市场安装
 
-本适配版以独立包 `@sophiacyl/dsh-plugin-waves@0.1.0-beta.1` 发布，来源为 `Sophiacyl/dsh-plugin-waves` 的 `release/npm` 分支；原始项目与作者信息保留，许可证为 GPL-3.0。
+本适配版以独立包 `@sophiacyl/dsh-plugin-waves@0.1.0-beta.2` 发布，来源为 `Sophiacyl/dsh-plugin-waves` 的 `release/npm` 分支；原始项目与作者信息保留，许可证为 GPL-3.0。
 
 ```sh
-dsh plugin --profile web add @sophiacyl/dsh-plugin-waves@0.1.0-beta.1
+dsh plugin --profile web add @sophiacyl/dsh-plugin-waves@0.1.0-beta.2
 ```
 
 请勿与原版 `dsh-plugin-waves` 同时启用：两者提供相同的 `/ww` 命令、后端端口和网页路由。已安装原版时先停用原版；本包不会自动迁移其登录态或修改其数据。首次安装需要联网下载 Python 依赖、无头浏览器和上游游戏资源，体积会明显大于 npm 包。`ww登录` 可能使库街区 App 的登录态失效；重新登录库街区也可能使插件凭据失效。

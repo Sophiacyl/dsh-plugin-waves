@@ -1,6 +1,6 @@
 {
   "name": "@sophiacyl/dsh-plugin-waves",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "license": "GPL-3.0",
   "type": "module",
   "description": "鸣潮 dsh-go 原生测试适配：查询、面板、练度与设置；基于 Loping151/dsh-plugin-waves",
@@ -83,7 +83,7 @@
           "title": "修改设置",
           "icon": "edit",
           "placement": [
-            "plugin"
+            "session.tab"
           ]
         }
       ]
