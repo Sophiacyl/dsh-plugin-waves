@@ -180,9 +180,11 @@ step "注册进 dsh profile: $PROFILE"
 dsh plugin --profile "$PROFILE" add "file:$ROOT" >/dev/null
 # 加载器按自身位置解析裸包名, 这里补一条链接
 DSH_NM="$(dirname "$(dirname "$(readlink -f "$(command -v dsh)")")")/node_modules"
-PROFILE_PKG="${DSH_HOME:-$HOME/.dsh}/profiles/$PROFILE/node_modules/dsh-plugin-waves"
+PACKAGE_NAME="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).name' "$ROOT/package.json")"
+PROFILE_PKG="${DSH_HOME:-$HOME/.dsh}/profiles/$PROFILE/node_modules/$PACKAGE_NAME"
 if [ -d "$DSH_NM" ] && [ -d "$PROFILE_PKG" ]; then
-  ln -sfn "$PROFILE_PKG" "$DSH_NM/dsh-plugin-waves"
+  mkdir -p "$(dirname "$DSH_NM/$PACKAGE_NAME")"
+  ln -sfn "$PROFILE_PKG" "$DSH_NM/$PACKAGE_NAME"
 fi
 NODE_VER="$(node -v 2>/dev/null | sed 's/^v//')"
 NODE_MAJOR="${NODE_VER%%.*}"; NODE_MINOR="$(echo "$NODE_VER" | cut -d. -f2)"

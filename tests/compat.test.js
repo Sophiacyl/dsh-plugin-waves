@@ -170,12 +170,12 @@ test('service env drops bracketed no_proxy entries that httpx rejects', async ()
 
 test('config page lives on the plugins page and falls back to settings only without it', async () => {
   const { slots } = await clientFixture()
-  assert.ok(slots.has('plugins.bundle.config:dsh-plugin-waves'))
+  assert.ok(slots.has('plugins.bundle.config:@sophiacyl/dsh-plugin-waves'))
   assert.ok(!slots.has('settings.section:waves'))
 
   const legacy = await clientFixture(undefined, { deferred: ['plugins.bundle.config'] })
   assert.ok(legacy.slots.has('settings.section:waves'))
   legacy.declare('plugins.bundle.config')
-  assert.ok(legacy.slots.has('plugins.bundle.config:dsh-plugin-waves'))
+  assert.ok(legacy.slots.has('plugins.bundle.config:@sophiacyl/dsh-plugin-waves'))
   assert.ok(!legacy.slots.has('settings.section:waves'))
 })

@@ -1,6 +1,6 @@
 - insert:
     - id: waves-plugin
-      name: 'dsh-plugin-waves'
+      name: '@sophiacyl/dsh-plugin-waves'
       config:
         port: 9777
         autoStart: true

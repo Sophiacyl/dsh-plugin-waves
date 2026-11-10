@@ -16,6 +16,18 @@
 
 开新会话首次发送指令将同时发送你好，此为dsh目前固有限制，否则无法显示指令结果。
 
+## npm 测试版与市场安装
+
+本适配版以独立包 `@sophiacyl/dsh-plugin-waves@0.1.0-beta.1` 发布，来源为 `Sophiacyl/dsh-plugin-waves` 的 `release/npm` 分支；原始项目与作者信息保留，许可证为 GPL-3.0。
+
+```sh
+dsh plugin --profile web add @sophiacyl/dsh-plugin-waves@0.1.0-beta.1
+```
+
+请勿与原版 `dsh-plugin-waves` 同时启用：两者提供相同的 `/ww` 命令、后端端口和网页路由。已安装原版时先停用原版；本包不会自动迁移其登录态或修改其数据。首次安装需要联网下载 Python 依赖、无头浏览器和上游游戏资源，体积会明显大于 npm 包。`ww登录` 可能使库街区 App 的登录态失效；重新登录库街区也可能使插件凭据失效。
+
+测试版的聊天媒体卡片最终显示仍待用户验收，不以静态市场扫描冒充视觉验收。
+
 ## dsh-go 原生适配（本分支）
 
 本分支是基于 [Loping151/dsh-plugin-waves](https://github.com/Loping151/dsh-plugin-waves) 的 dsh-go 测试适配，保留上游历史及 GPL-3.0 许可证。适配代码位于本 fork 的 `dsh-go` 分支；聊天新媒体卡片的 App 内最终显示仍待确认，详见 [验证记录](./DSH-GO-VERIFICATION.md)。
